@@ -1,0 +1,40 @@
+name: Handle Discussions
+
+on:
+  discussion:
+    types: [created]   # 仅监听新讨论
+
+permissions:
+  contents: write
+  discussions: read
+
+jobs:
+  process-discussion:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Process discussion content
+        id: process
+        run: |
+          python .github/scripts/process_discussion.py
+        env:
+          DISCUSSION_BODY: ${{ github.event.discussion.body }}
+
+      - name: Commit and push changes
+        if: always() && (steps.process.outcome == 'success')
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --staged --quiet || git commit -m "chore: process discussion content [skip ci]"
+          git push
