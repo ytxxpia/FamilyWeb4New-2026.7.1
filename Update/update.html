@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>发布工具</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #ffffff;
+            margin: 0;
+            padding: 40px 20px;
+            display: flex;
+            justify-content: center;
+            color: #1a1a1a;
+        }
+        .container {
+            max-width: 520px;
+            width: 100%;
+        }
+        .tabs {
+            display: flex;
+            gap: 0;
+            border-bottom: 1px solid #d0d7de;
+            margin-bottom: 24px;
+        }
+        .tab {
+            padding: 12px 20px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #57606a;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            user-select: none;
+            border-radius: 12px 12px 0 0;
+        }
+        .tab.active {
+            color: #456995;
+            border-bottom-color: #456995;
+            font-weight: 500;
+        }
+        .tab:hover {
+            color: #456995;
+        }
+        .form-group {
+            margin-bottom: 16px;
+        }
+        label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            color: #24292f;
+            margin-bottom: 4px;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #d0d7de;
+            border-radius: 12px;
+            font-size: 14px;
+            box-sizing: border-box;
+            background: #ffffff;
+            color: #1a1a1a;
+            font-family: inherit;
+        }
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #456995;
+            box-shadow: 0 0 0 3px rgba(69, 105, 149, 0.1);
+        }
+        textarea {
+            height: 140px;
+            resize: vertical;
+            line-height: 1.6;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #456995;
+            color: #ffffff;
+            border: none;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            margin-top: 4px;
+        }
+        button:hover {
+            background: #3a5a7e;
+        }
+        button:disabled {
+            background: #b0c4d8;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 16px;
+            padding: 10px 12px;
+            border-radius: 12px;
+            font-size: 14px;
+            display: none;
+        }
+        .result.success {
+            display: block;
+            background: #f0f6fa;
+            color: #2c5a7a;
+            border: 1px solid #b8d0e8;
+        }
+        .result.error {
+            display: block;
+            background: #fdf0f0;
+            color: #a13030;
+            border: 1px solid #f5c8c8;
+        }
+        .result.loading {
+            display: block;
+            background: #f5f5f5;
+            color: #555555;
+            border: 1px solid #d0d7de;
+        }
+        .hidden {
+            display: none;
+        }
+        .hint {
+            font-size: 12px;
+            color: #8b949e;
+            margin-top: 2px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    <div class="tabs">
+        <div class="tab active" data-tab="blog" onclick="switchTab('blog')">发布博客</div>
+        <div class="tab" data-tab="notice" onclick="switchTab('notice')">发布公告</div>
+    </div>
+
+    <!-- 博客表单 -->
+    <div id="blogForm">
+        <div class="form-group">
+            <label>作者</label>
+            <input type="text" id="author" value="admin">
+        </div>
+        <div class="form-group">
+            <label>日期</label>
+            <input type="date" id="date">
+        </div>
+        <div class="form-group">
+            <label>标题</label>
+            <input type="text" id="title" placeholder="文章标题">
+        </div>
+        <div class="form-group">
+            <label>正文</label>
+            <textarea id="content" placeholder="输入正文..."></textarea>
+        </div>
+        <button onclick="publishBlog()">发布</button>
+        <div id="blogResult" class="result"></div>
+    </div>
+
+    <!-- 公告表单 -->
+    <div id="noticeForm" class="hidden">
+        <div class="form-group">
+            <label>日期</label>
+            <input type="date" id="noticeDate">
+        </div>
+        <div class="form-group">
+            <label>正文</label>
+            <textarea id="noticeContent" placeholder="输入公告内容..."></textarea>
+        </div>
+        <button onclick="publishNotice()">发布</button>
+        <div id="noticeResult" class="result"></div>
+    </div>
+
+</div>
+
+<script>
+
+    // 自动填充日期
+    (function() {
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('date').value = today;
+        document.getElementById('noticeDate').value = today;
+    })();
+
+    // 切换 Tab
+    function switchTab(tab) {
+        document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+        document.querySelector('.tab[data-tab="' + tab + '"]').classList.add('active');
+
+        if (tab === 'blog') {
+            document.getElementById('blogForm').classList.remove('hidden');
+            document.getElementById('noticeForm').classList.add('hidden');
+        } else {
+            document.getElementById('blogForm').classList.add('hidden');
+            document.getElementById('noticeForm').classList.remove('hidden');
+        }
+
+        document.getElementById('blogResult').className = 'result';
+        document.getElementById('blogResult').style.display = 'none';
+        document.getElementById('noticeResult').className = 'result';
+        document.getElementById('noticeResult').style.display = 'none';
+    }
+
+    // 通用：创建 Discussion
+    async function createDiscussion(title, body) {
+        const owner = prompt('GitHub 用户名：');
+        if (!owner) return null;
+        const repo = prompt('仓库名：');
+        if (!repo) return null;
+        const token = prompt('Personal Access Token：');
+        if (!token) return null;
+
+        const url = 'https://api.github.com/repos/' + owner + '/' + repo + '/discussions';
+
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Authorization': 'token ' + token,
+                'Accept': 'application/vnd.github.v3+json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                title: title,
+                body: body,
+                category: 'General'
+            })
+        });
+
+        return response;
+    }
+
+    // 显示结果
+    function showResult(id, msg, type) {
+        const el = document.getElementById(id);
+        el.textContent = msg;
+        el.className = 'result ' + type;
+        el.style.display = 'block';
+        setTimeout(function() {
+            el.style.display = 'none';
+        }, 8000);
+    }
+
+    // 发布博客
+    async function publishBlog() {
+        const author = document.getElementById('author').value.trim();
+        const date = document.getElementById('date').value;
+        const title = document.getElementById('title').value.trim();
+        const content = document.getElementById('content').value.trim();
+
+        if (!author || !date || !title || !content) {
+            showResult('blogResult', '请填写所有字段', 'error');
+            return;
+        }
+
+        const body = '//w-' + author + '@d-' + date + '@n-' + title + '//\n\n' + content;
+        const discussionTitle = '博客：' + title;
+
+        showResult('blogResult', '提交中...', 'loading');
+
+        try {
+            const response = await createDiscussion(discussionTitle, body);
+            if (!response) return;
+
+            if (response.ok) {
+                showResult('blogResult', '发布成功', 'success');
+                document.getElementById('content').value = '';
+            } else {
+                const err = await response.json();
+                showResult('blogResult', '失败：' + (err.message || response.status), 'error');
+            }
+        } catch (err) {
+            showResult('blogResult', '网络错误：' + err.message, 'error');
+        }
+    }
+
+    // 发布公告
+    async function publishNotice() {
+        const date = document.getElementById('noticeDate').value;
+        const content = document.getElementById('noticeContent').value.trim();
+
+        if (!date || !content) {
+            showResult('noticeResult', '请填写所有字段', 'error');
+            return;
+        }
+
+        const body = '//d-' + date + '//\n\n' + content;
+        const discussionTitle = '公告：' + date;
+
+        showResult('noticeResult', '提交中...', 'loading');
+
+        try {
+            const response = await createDiscussion(discussionTitle, body);
+            if (!response) return;
+
+            if (response.ok) {
+                showResult('noticeResult', '发布成功', 'success');
+                document.getElementById('noticeContent').value = '';
+            } else {
+                const err = await response.json();
+                showResult('noticeResult', '失败：' + (err.message || response.status), 'error');
+            }
+        } catch (err) {
+            showResult('noticeResult', '网络错误：' + err.message, 'error');
+        }
+    }
+
+</script>
+
+</body>
+</html>
