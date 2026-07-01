@@ -10,5 +10,11 @@
     "date": "2026-07-01 13:37:38",
     "action": "Update blog",
     "detail": "My First Post (作者: alice)"
+  },
+  {
+    "timestamp": "2026-07-01T13:42:20.293734",
+    "date": "2026-07-01 13:42:20",
+    "action": "Update Notice",
+    "detail": "日期: 2026.7.1"
   }
 ]
