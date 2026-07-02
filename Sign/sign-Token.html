@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>配置 Token</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f5f5f5;min-height:100vh;display:flex;justify-content:center;align-items:center;padding:20px}
+        .container{background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,0.08);padding:32px;max-width:480px;width:100%}
+        h1{font-size:22px;color:#1a1a2e;font-weight:600;margin-bottom:4px}
+        .subtitle{color:#6b7280;font-size:13px;margin-bottom:24px;padding-bottom:14px;border-bottom:1px solid #eaeaea}
+        .form-group{margin-bottom:18px}
+        label{display:block;font-weight:500;font-size:13px;color:#1a1a2e;margin-bottom:4px}
+        label .required{color:#dc3545}
+        input{width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:14px;font-family:monospace;background:#fafafa;transition:border-color .2s}
+        input:focus{outline:none;border-color:#456995;background:#fff;box-shadow:0 0 0 3px rgba(69,105,149,0.12)}
+        .btn{width:100%;padding:10px;background:#456995;color:#fff;border:none;border-radius:6px;font-size:15px;font-weight:500;cursor:pointer;transition:background .2s}
+        .btn:hover{background:#3a5a7d}
+        .btn:disabled{background:#9ca3af;cursor:not-allowed}
+        .btn-secondary{background:#6b7280;margin-top:10px}
+        .btn-secondary:hover{background:#4b5563}
+        #message{margin-top:14px;padding:10px 14px;border-radius:6px;display:none;font-size:14px;font-weight:500}
+        #message.success{display:block;background:#e6f7e6;color:#0a5e0a;border:1px solid #b3e0b3}
+        #message.error{display:block;background:#fde8e8;color:#8b1a1a;border:1px solid #f5c2c2}
+        #message.info{display:block;background:#e8f0fe;color:#1a3a7a;border:1px solid #b8cce8}
+        .hint{font-size:12px;color:#6b7280;margin-top:6px;line-height:1.5}
+        .hint a{color:#456995;text-decoration:none}
+        .hint a:hover{text-decoration:underline}
+        .status-row{display:flex;justify-content:space-between;align-items:center;background:#f8f9fa;border-radius:6px;padding:10px 14px;margin-bottom:20px;border:1px solid #e5e7eb}
+        .status-label{font-size:13px;color:#6b7280}
+        .status-value{font-size:13px;font-weight:500}
+        .status-value.configured{color:#16a34a}
+        .status-value.missing{color:#dc2626}
+        .btn-group{display:flex;gap:10px}
+        .btn-group .btn{flex:1}
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Token 配置</h1>
+    <p class="subtitle">输入 GitHub Personal Access Token 以启用内容发布</p>
+
+    <div class="status-row">
+        <span class="status-label">当前状态</span>
+        <span class="status-value missing" id="statusValue">未配置</span>
+    </div>
+
+    <div class="form-group">
+        <label>GitHub Token <span class="required">*</span></label>
+        <input type="password" id="tokenInput" placeholder="输入你的 GitHub Token">
+        <div class="hint">
+            需要 <strong>repo</strong> 和 <strong>discussions</strong> 权限。
+            <a href="https://github.com/settings/tokens" target="_blank">去生成 Token</a>
+        </div>
+    </div>
+
+    <div class="btn-group">
+        <button class="btn" id="saveBtn">保存 Token</button>
+        <button class="btn btn-secondary" id="clearBtn">清除</button>
+    </div>
+
+    <div id="message"></div>
+</div>
+
+<script>
+(function() {
+    const DB_NAME = 'TokenDB';
+    const STORE_NAME = 'tokens';
+    const KEY_NAME = 'Token';
+
+    const tokenInput = document.getElementById('tokenInput');
+    const saveBtn = document.getElementById('saveBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const messageEl = document.getElementById('message');
+    const statusValue = document.getElementById('statusValue');
+
+    function openDB() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(DB_NAME, 1);
+            request.onupgradeneeded = function(e) {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains(STORE_NAME)) {
+                    db.createObjectStore(STORE_NAME);
+                }
+            };
+            request.onsuccess = function(e) { resolve(e.target.result); };
+            request.onerror = function(e) { reject(e.target.error); };
+        });
+    }
+
+    function saveToken(token) {
+        return openDB().then(db => {
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(STORE_NAME, 'readwrite');
+                const store = tx.objectStore(STORE_NAME);
+                const request = store.put(token, KEY_NAME);
+                request.onsuccess = function() { resolve(); };
+                request.onerror = function() { reject(request.error); };
+                tx.oncomplete = function() { db.close(); };
+            });
+        });
+    }
+
+    function getToken() {
+        return openDB().then(db => {
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(STORE_NAME, 'readonly');
+                const store = tx.objectStore(STORE_NAME);
+                const request = store.get(KEY_NAME);
+                request.onsuccess = function() { resolve(request.result || null); };
+                request.onerror = function() { reject(request.error); };
+                tx.oncomplete = function() { db.close(); };
+            });
+        });
+    }
+
+    function deleteToken() {
+        return openDB().then(db => {
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(STORE_NAME, 'readwrite');
+                const store = tx.objectStore(STORE_NAME);
+                const request = store.delete(KEY_NAME);
+                request.onsuccess = function() { resolve(); };
+                request.onerror = function() { reject(request.error); };
+                tx.oncomplete = function() { db.close(); };
+            });
+        });
+    }
+
+    function showMessage(type, text) {
+        messageEl.className = type;
+        messageEl.textContent = text;
+        messageEl.style.display = 'block';
+    }
+
+    function hideMessage() {
+        messageEl.style.display = 'none';
+    }
+
+    function updateStatus(token) {
+        if (token && token.length > 0) {
+            statusValue.textContent = '已配置';
+            statusValue.className = 'status-value configured';
+            tokenInput.value = token;
+        } else {
+            statusValue.textContent = '未配置';
+            statusValue.className = 'status-value missing';
+            tokenInput.value = '';
+        }
+    }
+
+    function loadTokenStatus() {
+        getToken().then(token => {
+            updateStatus(token);
+        }).catch(() => {
+            updateStatus(null);
+        });
+    }
+
+    saveBtn.addEventListener('click', function() {
+        const token = tokenInput.value.trim();
+        if (!token) {
+            showMessage('error', '请输入 Token');
+            return;
+        }
+
+        saveBtn.disabled = true;
+        hideMessage();
+
+        saveToken(token).then(() => {
+            showMessage('success', 'Token 保存成功');
+            updateStatus(token);
+        }).catch(() => {
+            showMessage('error', '保存失败，请重试');
+        }).finally(() => {
+            saveBtn.disabled = false;
+        });
+    });
+
+    clearBtn.addEventListener('click', function() {
+        if (!confirm('确定要清除已保存的 Token 吗？')) return;
+
+        clearBtn.disabled = true;
+        hideMessage();
+
+        deleteToken().then(() => {
+            showMessage('info', 'Token 已清除');
+            updateStatus(null);
+        }).catch(() => {
+            showMessage('error', '清除失败，请重试');
+        }).finally(() => {
+            clearBtn.disabled = false;
+        });
+    });
+
+    tokenInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            saveBtn.click();
+        }
+    });
+
+    loadTokenStatus();
+})();
+</script>
+</body>
+</html>
